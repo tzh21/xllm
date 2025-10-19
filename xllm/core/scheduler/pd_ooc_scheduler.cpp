@@ -55,7 +55,7 @@ PDOOCScheduler::PDOOCScheduler(Engine* engine, const Options& options)
                  engine->model_args().dtype() == "int8" ? 1 : 2,  // FIXME
                  options_.nnodes() / options_.dp_size()) {
   CHECK(options_.enable_pd_ooc());
-  DVLOG << "Creating a PD OOC Scheduler";
+  VLOG(1) << "Creating a PD OOC Scheduler";
 
   // PerfModel::PerfModel(double flop_s_gemm,
   // double flop_s_attn,
@@ -85,7 +85,7 @@ PDOOCScheduler::PDOOCScheduler(Engine* engine, const Options& options)
   }
 
   if (options_.instance_role().value() == InstanceRole::PREFILL) {
-    DVLOG << "Running dispatch_thread_";
+    VLOG(1) << "Running dispatch_thread_";
     // start dispatch thread for prefill instance
     dispatch_thread_ =
         std::make_unique<std::thread>(&PDOOCScheduler::dispatch_requests, this);
@@ -94,7 +94,7 @@ PDOOCScheduler::PDOOCScheduler(Engine* engine, const Options& options)
   }
 
   if (options_.instance_role().value() == InstanceRole::DECODE) {
-    DVLOG << "Running send_pull_signal_thread_";
+    VLOG(1) << "Running send_pull_signal_thread_";
     send_pull_signal_thread_ = std::make_unique<std::thread>(
         &PDOOCScheduler::decode_send_pull_signal, this);
   }
@@ -182,7 +182,7 @@ void PDOOCScheduler::prefill_step(const absl::Duration& timeout) {
     prefill_send_first_generation();
     prefill_send_multi_generations();
   } catch (const ForwardInterruptedException& e) {
-    DVLOG << "PDOOCScheduler catched a ForwardInterruptedException";
+    VLOG(1) << "PDOOCScheduler catched a ForwardInterruptedException";
     handle_prefill_interruption();
   }
 }
@@ -208,9 +208,9 @@ std::vector<Batch> PDOOCScheduler::prepare_batch() {
       if (request->offline()) {
         int current_offline_decode_bs =
             running_requests_.size() + waiting_priority_queue_offline_.size();
-        DVLOG << "Current offline decode batch size: "
-              << current_offline_decode_bs
-              << ", linear_saturation_bs_: " << linear_saturation_bs_;
+        VLOG(1) << "Current offline decode batch size: "
+                << current_offline_decode_bs
+                << ", linear_saturation_bs_: " << linear_saturation_bs_;
         if (current_offline_decode_bs < linear_saturation_bs_) {
           waiting_priority_queue_offline_.push(request);
         } else {
@@ -339,7 +339,7 @@ std::vector<Batch> PDOOCScheduler::prepare_batch() {
                           finished_requests);
   if (!running_sequences_.empty()) {
     step_status_ = StepStatus::ONLINE_PREFILL;
-    DVLOG << "Set step status to ONLINE PREFILL";
+    VLOG(1) << "Set step status to ONLINE PREFILL";
   } else {
     // In PD OOC mode, a batch can only consist entirely of online requests or
     // entirely of offline requests
@@ -352,7 +352,7 @@ std::vector<Batch> PDOOCScheduler::prepare_batch() {
                             finished_requests);
     if (!running_sequences_.empty()) {
       step_status_ = StepStatus::OFFLINE_PREFILL;
-      DVLOG << "Set step status to OFFLINE PREFILL";
+      VLOG(1) << "Set step status to OFFLINE PREFILL";
     } else {
       latency_budget = options_.max_global_tpot_ms();
       // Handle decoding requests.
@@ -376,11 +376,11 @@ std::vector<Batch> PDOOCScheduler::prepare_batch() {
                              running_queue_offline_);
       if (!running_sequences_.empty()) {
         step_status_ = StepStatus::DECODE;
-        DVLOG << "Set step status to DECODE";
+        VLOG(1) << "Set step status to DECODE";
       } else {
         step_status_ = StepStatus::IDLE;
         if (!previous_idle) {
-          DVLOG << "Reset step status to IDLE";
+          VLOG(1) << "Reset step status to IDLE";
         }
       }
     }
@@ -455,14 +455,14 @@ void PDOOCScheduler::handle_prefill_interruption() {
     request->set_preempted();
 
     // Add back to offline waiting queue for rescheduling
-    DVLOG << "Preempting offline request due to interruption: "
-          << request->request_id();
-    DVLOG << "waiting_priority_queue_offline_.size() before push: "
-          << waiting_priority_queue_offline_.size();
+    VLOG(1) << "Preempting offline request due to interruption: "
+            << request->request_id();
+    VLOG(1) << "waiting_priority_queue_offline_.size() before push: "
+            << waiting_priority_queue_offline_.size();
     waiting_priority_queue_offline_.push(request);
 
-    DVLOG << "Preempted offline request due to interruption: "
-          << request->request_id();
+    VLOG(1) << "Preempted offline request due to interruption: "
+            << request->request_id();
   }
 
   LOG(INFO) << "Handled prefill interruption: preempted "
@@ -722,13 +722,13 @@ void PDOOCScheduler::decode_send_pull_signal() {
       continue;
     }
 
-    DVLOG << "Sending a pull signal to a P node";
+    VLOG(1) << "Sending a pull signal to a P node";
 
     // WIP Send a pull signal to a P node
 
     // Select a P node
     std::string selected_prefill_instance = select_prefill_instance();
-    DVLOG << "Selected prefill instance: " << selected_prefill_instance;
+    VLOG(1) << "Selected prefill instance: " << selected_prefill_instance;
 
     // Build a stub
     proto::DisaggPDService_Stub* stub =
@@ -763,11 +763,11 @@ void PDOOCScheduler::decode_send_pull_signal() {
 
     // Pend until next trigger
     if (cntl.Failed() || !resp.ok()) {
-      DVLOG << "SendPullSignal failed";
+      VLOG(1) << "SendPullSignal failed";
       if (cntl.Failed()) {
-        DVLOG << "cntl.Failed";
+        VLOG(1) << "cntl.Failed";
       } else {
-        DVLOG << "!resp.ok()";
+        VLOG(1) << "!resp.ok()";
       }
       waiting_pull_finished_.store(false);
     } else {
@@ -876,7 +876,7 @@ void PDOOCScheduler::dispatch_requests() {
 
         // push to request_queue_, and will be executed by engine.
         request_queue_.write(requests[i]);
-        DVLOG << "Put a request into request_queue_";
+        VLOG(1) << "Put a request into request_queue_";
       }
     }
     // WIP Interrupt ongoing offline prefill requests when online requests come
@@ -884,8 +884,8 @@ void PDOOCScheduler::dispatch_requests() {
       if (options_.enable_forward_interruption() &&
           step_status_ == StepStatus::OFFLINE_PREFILL) {
         InterruptionBus::get_instance().publish(true);
-        // DVLOG << "Sent an interruption signal";
-        // DVLOG << "Interruption disabled";
+        // VLOG(1) << "Sent an interruption signal";
+        // VLOG(1) << "Interruption disabled";
       }
     }
   }
@@ -1162,11 +1162,11 @@ bool PDOOCScheduler::check_able_to_pull() {
 
 bool PDOOCScheduler::write_pull_signal(const proto::PullSignal& pull_signal) {
   if (pull_signals_.enqueue(pull_signal)) {
-    DVLOG << "Wrote a pull signal into a queue: "
-          << pull_signal.source_instance_name();
+    VLOG(1) << "Wrote a pull signal into a queue: "
+            << pull_signal.source_instance_name();
     return true;
   } else {
-    DVLOG << "Failed to write a pull signal into a queue";
+    VLOG(1) << "Failed to write a pull signal into a queue";
     return false;
   }
 }
@@ -1209,12 +1209,12 @@ void PDOOCScheduler::prepare_offline_dispatch_queue() {
           std::make_pair(offline_request, pull_signal.source_instance_name());
       offline_requests_to_dispatch_.enqueue(dispatch_pair);
 
-      DVLOG << "Moved offline request " << offline_request->request_id()
-            << " to dispatch queue for instance "
-            << pull_signal.source_instance_name()
-            << "\n        preferred_len: " << preferred_len
-            << ", max_len: " << max_len << ", selected len: "
-            << offline_request->sequences()[0]->num_tokens();
+      VLOG(1) << "Moved offline request " << offline_request->request_id()
+              << " to dispatch queue for instance "
+              << pull_signal.source_instance_name()
+              << "\n        preferred_len: " << preferred_len
+              << ", max_len: " << max_len << ", selected len: "
+              << offline_request->sequences()[0]->num_tokens();
     } else {
       // If no offline request, put the signal back for future use.
       unused_signals.push_back(pull_signal);
@@ -1238,7 +1238,7 @@ void PDOOCScheduler::dispatch_offline_requests() {
       continue;
     }
 
-    DVLOG << "Dispatching offline requests";
+    VLOG(1) << "Dispatching offline requests";
 
     auto request = dispatch_pair.first;
     auto target_instance = dispatch_pair.second;
@@ -1303,8 +1303,8 @@ void PDOOCScheduler::dispatch_offline_requests() {
           std::make_pair(request, target_instance);
       offline_requests_to_transfer_.enqueue(transfer_pair);
 
-      DVLOG << "Successfully dispatched offline request "
-            << request->request_id() << " to " << target_instance;
+      VLOG(1) << "Successfully dispatched offline request "
+              << request->request_id() << " to " << target_instance;
     }
   }
 }
