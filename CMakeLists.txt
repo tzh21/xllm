@@ -11,7 +11,7 @@ endif()
 
 if(USE_NPU)
   if(DEVICE_TYPE STREQUAL "USE_A3")
-      add_compile_definitions(USE_A3) 
+      add_compile_definitions(USE_A3)
       add_definitions(-DUSE_A3)
       set(USE_A3 ON)
       message(STATUS "Building for device: A3 (macro USE_A3 defined)")
@@ -22,25 +22,25 @@ if(USE_NPU)
       message(STATUS "Building for device: A2 (macro USE_A2 defined)")
   endif()
 
-  option(INSTALL_XLLM_KERNELS "Install xllm_kernels RPM" ON)  
+  option(INSTALL_XLLM_KERNELS "Install xllm_kernels RPM" ON)
   message(STATUS "INSTALL_XLLM_KERNELS enabled: ${INSTALL_XLLM_KERNELS}")
   if(INSTALL_XLLM_KERNELS)
     if(DEVICE_TYPE STREQUAL "USE_A3")
         message("downloading a3 arm xllm kernels")
-        file(DOWNLOAD 
+        file(DOWNLOAD
             "https://9n-das-tools.s3.cn-north-1.jdcloud-oss.com/xllm-ai/xllm_kernels/0.6.0/xllm_kernels-1.3.1-Linux.a3.arm.rpm"
             "${CMAKE_BINARY_DIR}/xllm_kernels.rpm"
         )
-    else()  
+    else()
       if(DEVICE_ARCH STREQUAL "ARM")
           message("downloading a2 arm xllm_kernels")
-          file(DOWNLOAD 
+          file(DOWNLOAD
               "https://9n-das-tools.s3.cn-north-1.jdcloud-oss.com/xllm-ai/xllm_kernels/0.6.0/xllm_kernels-1.3.1-Linux.a2.arm.rpm"
               "${CMAKE_BINARY_DIR}/xllm_kernels.rpm"
           )
       else()
           message("downloading a2 x86 xllm_kernels")
-          file(DOWNLOAD 
+          file(DOWNLOAD
               "https://9n-das-tools.s3.cn-north-1.jdcloud-oss.com/xllm-ai/xllm_kernels/0.6.0/xllm_kernels-1.3.1-Linux.a2.x86.rpm"
               "${CMAKE_BINARY_DIR}/xllm_kernels.rpm"
           )
@@ -139,8 +139,8 @@ endfunction()
 # Set default build type
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "Build type not set - defaulting to Release")
-  set(CMAKE_BUILD_TYPE "Release" 
-      CACHE STRING "Choose the type of build from: Debug Release RelWithDebInfo MinSizeRel Coverage." 
+  set(CMAKE_BUILD_TYPE "Release"
+      CACHE STRING "Choose the type of build from: Debug Release RelWithDebInfo MinSizeRel Coverage."
       FORCE
   )
 endif()
@@ -287,12 +287,12 @@ else()
     set(LIBTORCH_SOURCE_DIR ${FETCHCONTENT_BASE_DIR}/libtorch-src)
   endif()
 
-  FetchContent_Declare(libtorch 
-    URL ${LIBTORCH_URL} 
+  FetchContent_Declare(libtorch
+    URL ${LIBTORCH_URL}
     SOURCE_DIR ${LIBTORCH_SOURCE_DIR}
   )
   FetchContent_MakeAvailable(libtorch)
-  
+
   find_package(Torch REQUIRED PATHS ${LIBTORCH_SOURCE_DIR} NO_DEFAULT_PATH)
   message(STATUS "Downloading and using libtorch 2.1.0 for CPU at ${LIBTORCH_SOURCE_DIR}")
 endif()
@@ -315,6 +315,7 @@ if(USE_NPU)
       $ENV{XLLM_KERNELS_PATH}/include/xllm_kernels/core/include
       $ENV{XLLM_KERNELS_PATH}/include/xllm_kernels
       $ENV{XLLM_KERNELS_PATH}/include/
+      $ENV{ASDOPS_HOME_PATH}/include/
   )
 
   link_directories(
@@ -326,6 +327,8 @@ if(USE_NPU)
       $ENV{NPU_TOOLKIT_HOME}/lib64
       $ENV{NPU_HOME_PATH}/opp/vendors/xllm/op_api/lib/
       $ENV{XLLM_KERNELS_PATH}/lib/
+      $ENV{ASDOPS_HOME_PATH}/lib/
+      $ENV{LIBTORCH_ROOT}.libs/
   )
   link_libraries(cust_opapi)
 endif()

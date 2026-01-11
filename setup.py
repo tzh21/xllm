@@ -33,9 +33,9 @@ def get_cpu_arch():
 def get_cxx_abi():
     try:
         import torch
-        return torch.compiled_with_cxx11_abi()
+        return int(torch.compiled_with_cxx11_abi())
     except ImportError:
-        return False
+        return 0
 
 
 def get_base_dir():
@@ -60,7 +60,7 @@ def get_version():
 
     if not version:
         raise RuntimeError("Unable to find version string.")
-    
+
     version_suffix = os.getenv("XLLM_VERSION_SUFFIX")
     if version_suffix:
         version += version_suffix
@@ -127,6 +127,7 @@ def set_npu_envs():
 
     os.environ["PYTHON_INCLUDE_PATH"] = get_python_include_path()
     os.environ["PYTHON_LIB_PATH"] =  get_torch_root_path()
+    os.environ["PYTORCH_INSTALL_PATH"] = get_torch_root_path()
     os.environ["LIBTORCH_ROOT"] = get_torch_root_path()
     os.environ["INSTALL_XLLM_KERNELS"] = "ON" if install_kernels else "OFF"
     NPU_TOOLKIT_HOME = os.getenv("NPU_TOOLKIT_HOME")
@@ -166,6 +167,7 @@ def set_npu_envs():
 
 
     ATB_HOME_PATH = ATB_PATH+"/latest/atb/cxx_abi_"+str(get_cxx_abi())
+    # print("Set ATB_HOME_PATH to ", ATB_HOME_PATH, flush=True)
     LD_LIBRARY_PATH = os.getenv("LD_LIBRARY_PATH", "")
     LD_LIBRARY_PATH = ATB_HOME_PATH+"/lib" + ":" + \
         ATB_HOME_PATH+"/examples" + ":" + \
@@ -231,7 +233,7 @@ class ExtBuild(build_ext):
     def initialize_options(self):
         build_ext.initialize_options(self)
         self.base_dir = get_base_dir()
-        self.device = None  
+        self.device = None
         self.arch = None
         self.install_xllm_kernels = None
 
@@ -293,7 +295,7 @@ class ExtBuild(build_ext):
             f"-DDEVICE_ARCH={self.arch.upper()}",
             f"-DINSTALL_XLLM_KERNELS={'ON' if self.install_xllm_kernels else 'OFF'}",
         ]
-        
+
         if self.device == "a2" or self.device == "a3":
             cmake_args += ["-DUSE_NPU=ON"]
             # set npu environment variables
@@ -316,7 +318,7 @@ class ExtBuild(build_ext):
             cmake_args += ["-DUSE_CXX11_ABI=ON"]
         else:
             cmake_args += ["-DUSE_CXX11_ABI=OFF"]
-        
+
         build_args = ["--config", build_type]
         max_jobs = os.getenv("MAX_JOBS", str(os.cpu_count()))
         build_args += ["-j" + max_jobs]
@@ -438,7 +440,7 @@ def check_and_install_pre_commit():
     # check if .git is a directory
     if not os.path.isdir(".git"):
         return
-    
+
     if not os.path.exists(".git/hooks/pre-commit"):
         os.system("pre-commit install")
         if not os.path.exists(".git/hooks/pre-commit"):
@@ -473,7 +475,7 @@ def is_safe_directory_set(repo_path):
         existing_paths = result.stdout.strip().split("\n")
         return repo_path in existing_paths
     except subprocess.CalledProcessError:
-        return False 
+        return False
 
 def apply_patch_safely(patch_file_path, repo_path):
     print(f"🔍 Checking repo status: {repo_path}")
@@ -495,15 +497,15 @@ def apply_patch_safely(patch_file_path, repo_path):
         if not run_git_command("git reset --hard", cwd=repo_path):
             print("❌ Failed to reset changes!")
             return False
-    
+
     print(f"🛠️ Apply patch: {patch_file_path}")
     apply_success = run_git_command(f"git apply --check {patch_file_path}", cwd=repo_path, check=False)
-    
+
     if apply_success:
         if not run_git_command(f"git apply {patch_file_path}", cwd=repo_path):
             print("❌ apply patch fail!")
             apply_success = False
-    
+
     if apply_success:
         print("🎉 Success apply patch!")
         return True
@@ -539,7 +541,7 @@ if __name__ == "__main__":
     if '--dry_run' not in sys.argv:
         apply_patch()
     else:
-        sys.argv.remove("--dry_run") 
+        sys.argv.remove("--dry_run")
     if '--install-xllm-kernels' in sys.argv:
         idx = sys.argv.index('--install-xllm-kernels')
         if idx + 1 < len(sys.argv):
@@ -558,7 +560,7 @@ if __name__ == "__main__":
         BUILD_TEST_FILE = False
     if "SKIP_EXPORT" in os.environ:
         BUILD_EXPORT = False
-    
+
     version = get_version()
 
     # check and install git pre-commit
